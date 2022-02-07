@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Box, Stack, Typography } from '@mui/material';
 import wordAnswers from './wordAnswers'
 import wordGuesses from './wordGuesses'
+import Keyboard from './Keyboard';
 import './App.css';
 
 const wordAnswerList = wordAnswers;
@@ -19,15 +20,37 @@ const LetterState = {
   GREEN: 3,
 }
 
+const letterToIndex = letter => letter.toLowerCase().charCodeAt() - 'a'.charCodeAt();
+
 const setGuessStates = (guess, answer) => {
+  
+  // let answerLettersRemaining = new Set(answer); // RIP: duplicate letters not allowed in set
+  let letterCounts = Array(26).fill(0);
+  for (let c of answer) {
+    let index = letterToIndex(c);
+    console.log(index);
+    letterCounts[index]++;
+  }
+  console.log(letterCounts);
   for (let i = 0; i < guess.length; i++) {
     const letter = guess[i][0].toLowerCase();
     console.log("matching", letter, answer[i]);
     if (letter === answer[i]) {
-      console.log(letter, answer[i], 'green');
       guess[i][1] = LetterState.GREEN;
-    } else if (answer.includes(letter)) {
+      let index = letter.charCodeAt() - 'a'.charCodeAt();
+      letterCounts[index]--;
+    }
+  }
+  console.log(letterCounts);
+  for (let i = 0; i < guess.length; i++) {
+    const letter = guess[i][0].toLowerCase();
+    let index = letter.charCodeAt() - 'a'.charCodeAt();
+    console.log("matching", letter, answer[i]);
+    if (letter === answer[i]) {
+      continue;
+    } else if (answer.includes(letter) && letterCounts[index] > 0) {
       guess[i][1] = LetterState.YELLOW;
+      letterCounts[index]--;
       console.log(letter, answer[i], 'yellow');
     } else {
       guess[i][1] = LetterState.GREY;
@@ -45,11 +68,11 @@ const Game = (props) => {
   // const word = "hello";
   // const word = wordAnswerList[Math.floor(Math.random() * wordAnswerList.length)];
 
-  const [word, setWord] = useState(() => wordAnswerList[Math.floor(Math.random() * wordAnswerList.length)]);
+  // const [word, setWord] = useState(() => wordAnswerList[Math.floor(Math.random() * wordAnswerList.length)]);
+  const [word, setWord] = useState("grand");
   const [guess, setGuess] = useState([]);
   const [guessHistory, setGuessHistory] = useState([]);
-  // const [usedLetters, setUsedLetters] = useState(new Set());
-  // const [letterStates, setLetterStates] = useState(Array(26).fill(LetterState.GREY));
+  const [letterStates, setLetterStates] = useState(Array(26).fill(LetterState.BLANK));
 
   const submitGuessCallback = useRef();
 
@@ -59,15 +82,19 @@ const Game = (props) => {
 
   const handleKeyDown = (event) => {
     console.log('A key was pressed', event.keyCode);
-    let key = String.fromCharCode(event.keyCode);
-    if (key.length === 1 && key.match(/[a-zA-Z]/)) {
-      addGuessLetter(key);
-    } else if (key === '\b') {
+    let letter = String.fromCharCode(event.keyCode);
+    letterInput(letter);
+  };
+
+  const letterInput = (letter) => {
+    if (letter.length === 1 && letter.match(/[a-zA-Z]/)) {
+      addGuessLetter(letter);
+    } else if (letter === '\b') {
       removeGuessLetter();
-    } else if (key === '\r') {
+    } else if (letter === '\r') {
       submitGuessCallback.current();
     }
-  };
+  }
 
   useEffect(() => {
     window.addEventListener('keydown', handleKeyDown);
@@ -92,6 +119,16 @@ const Game = (props) => {
     console.log("submitting:", guess);
     if (isValidGuess(guess)) {
       setGuessStates(guess, word);
+      console.log(letterStates)
+      const letterStatesCopy = letterStates.slice();
+      for (let i = 0; i < guess.length; i++) {
+        const [letter, state] = guess[i];
+        const index = letterToIndex(letter);
+        console.log(letter, letterStatesCopy[index], state);
+        letterStatesCopy[index] = Math.max(letterStatesCopy[index], state);
+      }
+      setLetterStates(letterStatesCopy);
+      
       setGuessHistory(gh => [...gh, guess]);
       setGuess([]);
       console.log('submitted');
@@ -110,6 +147,7 @@ const Game = (props) => {
     <div 
       style={{
         display: 'flex',
+        flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
       }}
@@ -118,6 +156,10 @@ const Game = (props) => {
         wordSize={wordSize}
         guess={guess}
         guessHistory={guessHistory}
+      />
+      <Keyboard
+        onClick={letterInput}
+        letterStates={letterStates}
       />
     </div>
   )
@@ -155,7 +197,7 @@ const Board = (props) => {
           alignItems: 'center',
           justifyContent: 'center',
           backgroundColor: () => {
-            if (state === LetterState.GREY) { return "#636363" }
+            if (state === LetterState.GREY) { return "#3d3d3d" }
             else if (state === LetterState.YELLOW) { return "orange" }
             else if (state === LetterState.GREEN) { return "green" }
             else { return null }
@@ -208,7 +250,8 @@ function App() {
       style={{
         paddingTop: 50,
         display: 'flex',
-        alignItems: 'flex-start',
+        flexDirection: 'column',
+        // alignItems: 'flex-start',
         justifyContent: 'center',
         backgroundColor: "#121212",
       }}
